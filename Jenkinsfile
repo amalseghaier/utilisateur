@@ -13,18 +13,18 @@ pipeline {
                 }
             }
         }
+    stage('Build and Rename Docker Image') {
+         steps {
+           script {
+            // Construire l'image Docker
+            bat 'docker build -t evaluation_2 .'
 
-        stage('Build and Rename Docker Image') {
-            steps {
-                script {
-                    // Construire l'image Docker
-                    bat 'docker build -t amalseghaier/evaluation:%BUILD_ID% .'
-
-                    // Renommer l'image Docker
-                    bat "docker tag amalseghaier/evaluation:%BUILD_ID% amalseghaier/evaluation:latest"
-                }
-            }
+            // Renommer l'image Docker
+            bat "docker tag evaluation_2 amalseghaier/evaluation_2"
         }
+    }
+}
+
 
         stage('Build and Run Docker Container') {
             steps {
