@@ -21,10 +21,10 @@ pipeline {
             steps {
                 script {
                     // Build the Docker image
-                    bat 'docker build -t evaluation_${BUILD_ID} .'
+                    bat 'docker build -t amalseghaier/evaluation:latest .'
 
-                    // Tag and rename the Docker image
-                    bat "docker tag evaluation_${BUILD_ID} amalseghaier/evaluation_${BUILD_ID}"
+                    // Tag the Docker image
+                    bat 'docker tag amalseghaier/evaluation:latest amalseghaier/evaluation:release'
                 }
             }
         }
@@ -33,10 +33,11 @@ pipeline {
             steps {
                 script {
                     // Run the Docker container
-                    bat "docker run -d --name evaluation amalseghaier/evaluation_${BUILD_ID}"
+                    bat 'docker run -d --name evaluation -p 8000:80 amalseghaier/evaluation:release'
                 }
             }
         }
     }
 }
+
 
