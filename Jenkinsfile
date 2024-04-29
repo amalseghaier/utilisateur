@@ -1,10 +1,13 @@
 pipeline {
     agent any
+
     environment {
         DOCKER_PATH = "C:\\Program Files\\Docker\\cli-plugins"
         PATH = "${DOCKER_PATH}:${PATH}"
+        // DOCKERHUB_CREDENTIALS = credentials('DockerHub')
         NODEJS_PATH = "C:\\Program Files (x86)\\nodejs"
     }
+
     stages {
         stage('Checkout') {
             steps {
@@ -13,32 +16,27 @@ pipeline {
                 }
             }
         }
-    stage('Build and Rename Docker Image') {
-         steps {
-           script {
-            // Construire l'image Docker
-            bat 'docker build -t evaluation_2 .'
 
-            // Renommer l'image Docker
-            bat "docker tag evaluation_2 amalseghaier/evaluation_2"
+        stage('Build and Rename Docker Image') {
+            steps {
+                script {
+                    // Build the Docker image
+                    bat 'docker build -t evaluation_${BUILD_ID} .'
+
+                    // Tag and rename the Docker image
+                    bat "docker tag evaluation_${BUILD_ID} amalseghaier/evaluation_${BUILD_ID}"
+                }
+            }
         }
-    }
-}
-
 
         stage('Build and Run Docker Container') {
             steps {
                 script {
-                    // Exécuter le conteneur Docker
-                    bat "docker run -d --name evaluation amalseghaier/evaluation:latest"
+                    // Run the Docker container
+                    bat "docker run -d --name evaluation amalseghaier/evaluation_${BUILD_ID}"
                 }
             }
         }
     }
 }
 
-            echo 'Build failed!'
-            // Add any failure post-build actions here
-        }
-    }
-}
