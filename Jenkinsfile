@@ -1,81 +1,42 @@
 pipeline {
     agent any
-
     environment {
-        NODEJS_HOME = tool name: 'NodeJS', type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
-        PATH = "${env.NODEJS_HOME}/bin:${env.PATH}"
-        CHROME_BIN = '/usr/bin/google-chrome' // Path to Chrome binary
-        DOCKER_HUB_REGISTRY = 'docker.io' // Docker Hub registry URL
+        DOCKER_PATH = "C:\\Program Files\\Docker\\cli-plugins"
+        PATH = "${DOCKER_PATH}:${PATH}"
+        NODEJS_PATH = "C:\\Program Files (x86)\\nodejs"
     }
-
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    checkout scm
+                }
             }
         }
 
-        stage('Install dependencies') {
-          steps {
-    sh '${NODEJS_HOME}/bin/npm install'
-    // sh '${NODEJS_HOME}/bin/npm install jest --save-dev'
-    // sh '${NODEJS_HOME}/bin/npm install bcrypt'
-}
-            }
-        
-
-        stage('Fix Permissions') {
-            steps {
-                // Fix permissions for the project directory and node_modules
-                sh 'chmod -R 777 .'
-            }
-        }
-
-
-        stage('Build') {
-            steps {
-                // sh 'node app.js'
-                sh 'npm run build'
-            }
-        }
-
-        // stage('Test') {
-        //     steps {
-        //         // Run Jest tests
-        //         sh 'npm test'
-        //     }
-        // }
-
-        stage('Build Docker image') {
-            steps {
-                sh 'docker build -t amalseghaier/user:latest Dockerfile .'
-                // Tag the Docker image with a version
-                sh 'docker tag user:latest amalseghaier/user:latest'
-            }
-        }
-
-        stage('Deploy Docker image') {
+        stage('Build and Rename Docker Image') {
             steps {
                 script {
-                    // Push Docker image to Docker Hub
-                    withCredentials([string(credentialsId: 'token', variable: 'DOCKER_TOKEN')]) {
-                        docker.withRegistry('https://index.docker.io/v1/', '12') {
-                            // Push both the latest and tagged images
-                            docker.image('amalseghaier/user:latest').push('latest')
-                        }
-                    }
+                    // Construire l'image Docker
+                    bat 'docker build -t amalseghaier/evaluation:%BUILD_ID% .'
+
+                    // Renommer l'image Docker
+                    bat "docker tag amalseghaier/evaluation:%BUILD_ID% amalseghaier/evaluation:latest"
+                }
+            }
+        }
+
+        stage('Build and Run Docker Container') {
+            steps {
+                script {
+                    // Exécuter le conteneur Docker
+                    bat "docker run -d --name evaluation amalseghaier/evaluation:latest"
                 }
             }
         }
     }
+}
 
-    post {
-        success {
-            echo 'Build succeeded!'
-            // Add any success post-build actions here
-        }
-
-        failure {
             echo 'Build failed!'
             // Add any failure post-build actions here
         }
