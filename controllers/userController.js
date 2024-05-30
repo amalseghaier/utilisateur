@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const Utilisateur = require('../model/user.model');
+const Classe = require('../model/classeModel');
+const Departement = require('../model/departementModel');
 const { Op } = require('sequelize');
 const accessTokenSecret = process.env.JWT_SECRET || 'votre_clé_secrète_par_défaut';
 
@@ -8,21 +10,20 @@ const ERROR_MESSAGE = 'L\'authentification a échoué';
 const SUCCESS_MESSAGE = 'L\'authentification a réussi';
 
 // Fonction de création d'un nouvel utilisateur
-// Fonction de création d'un nouvel utilisateur
 exports.createUser = async (req, res) => {
   try {
-    const { nom, prenom, email, mot_de_passe, cin, type_utilisateur, id_classe, id_departement} = req.body;
+    const { nom, prenom, email, mot_de_passe, cin, type_utilisateur, id_classe, id_departement } = req.body;
 
-    // Check if user with the same email already exists
+    // Vérifie si l'utilisateur avec le même email existe déjà
     const existingUser = await Utilisateur.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: 'User with this email already exists' });
+      return res.status(400).json({ error: 'Un utilisateur avec cette adresse e-mail existe déjà' });
     }
 
-    // Hash the password
+    // Hachage du mot de passe
     const hashedPassword = await bcrypt.hash(mot_de_passe, 10);
 
-    // Create the new user
+    // Crée l'utilisateur en associant les clés étrangères aux classes et départements trouvés
     const newUser = await Utilisateur.create({
       nom,
       prenom,
@@ -30,37 +31,39 @@ exports.createUser = async (req, res) => {
       mot_de_passe: hashedPassword,
       cin,
       type_utilisateur,
-      id_classe, 
+      id_classe,
       id_departement,
     });
 
-    res.status(201).json({ message: 'User created successfully', user: newUser });
+    res.status(201).json(newUser);
   } catch (error) {
-    console.error('Error creating user:', error);
-    res.status(500).json({ error: 'An error occurred while creating the user' });
+    console.error(error);
+    res.status(500).json({ error: 'Erreur lors de la création de l\'utilisateur' });
   }
 };
 
 
+
 // Fonction pour obtenir tous les utilisateurs (besoin d'authentification)
-exports.getAllUsers = async (req, res) => {
+exports.getAllEtudiantUsers = async (req, res) => {
   try {
-    const users = await Utilisateur.findAll({ where: { type_utilisateur: 'etudiant' } });
-    res.status(200).json(users);
+    const etudiants = await Utilisateur.findAll({ where: { type_utilisateur: 'etudiant' } });
+    res.status(200).json(etudiants);
   } catch (error) {
     console.error('Error getting all etudiant users:', error);
     res.status(500).json({ error: 'An error occurred while getting all etudiant users' });
   }
 };
-exports.getAllUsers = async (req, res) => {
+exports.getAllEnseignantUsers = async (req, res) => {
   try {
-    const users = await Utilisateur.findAll({ where: { type_utilisateur: 'enseignant' } });
-    res.status(200).json(users);
+    const enseignants = await Utilisateur.findAll({ where: { type_utilisateur: 'enseignant' } });
+    res.status(200).json(enseignants);
   } catch (error) {
     console.error('Error getting all enseignant users:', error);
     res.status(500).json({ error: 'An error occurred while getting all enseignant users' });
   }
 };
+
 
 
 // Fonction pour obtenir un utilisateur par ID (besoin d'authentification)
@@ -148,57 +151,63 @@ exports.searchUsersByName = async (req, res) => {
 // Fonction de connexion de l'utilisateur
 exports.loginUser = async (req, res) => {
   try {
-    const { cin, mot_de_passe } = req.body;
+    const { email, mot_de_passe } = req.body;
 
-    // Vérifie si 'cin' est une chaîne de 8 chiffres
-    if (!/^\d{8}$/.test(cin)) {
-      return res.status(400).json({ error: 'Le CIN doit être une chaîne de 8 chiffres' });
+    // Validation des données d'entrée
+    if (!email || !mot_de_passe) {
+      return res.status(400).json({ error: 'Veuillez fournir une adresse e-mail et un mot de passe' });
     }
 
-    // Recherche de l'utilisateur par CIN
-    const user = await Utilisateur.findOne({ where: { cin } });
+    // Recherche de l'utilisateur par email
+    const user = await Utilisateur.findOne({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: 'CIN ou mot de passe invalide' });
+      return res.status(401).json({ error: 'Adresse e-mail ou mot de passe invalide' });
     }
 
     // Comparaison des mots de passe hachés
     const isPasswordValid = await bcrypt.compare(mot_de_passe, user.mot_de_passe);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'CIN ou mot de passe invalide' });
+      return res.status(401).json({ error: 'Adresse e-mail ou mot de passe invalide' });
     }
 
-    // Génération du jeton JWT avec le rôle de l'utilisateur inclus
-    const token = jwt.sign({ id: user.id, cin: user.cin, type_utilisateur: user.type_utilisateur}, accessTokenSecret, { expiresIn: '1h' });
-
-    res.status(200).json({ token });
-
+    // Génération du jeton JWT avec données utilisateur
+    const token = jwt.sign(
+      { id: user.id, email: user.email, type_utilisateur: user.type_utilisateur },
+      accessTokenSecret,
+      { expiresIn: '2h' } // Expiration après 2 heures
+    );
+    res.status(200).json({ token, type_utilisateur: user.type_utilisateur });
   } catch (error) {
-    console.error('Erreur de connexion de l\'utilisateur :', error);
+    console.error('Erreur lors de la connexion de l\'utilisateur :', error);
     res.status(500).json({ error: 'Une erreur s\'est produite lors de la connexion de l\'utilisateur' });
   }
 };
 
-// Middleware d'authentification
-// exports.authenticateUser = async (req, res, next) => {
-//   try {
-//     const token = req.headers.authorization;
-//     if (!token) {
-//       return res.status(401).json({ error: 'Aucun jeton fourni' });
-//     }
+exports.loginAdmin = async (req, res) => {
+  try {
+    const { email, mot_de_passe } = req.body;
 
-//     jwt.verify(token, accessTokenSecret, async (err, decoded) => {
-//       if (err) {
-//         return res.status(401).json({ error: 'Jeton invalide' });
-//       }
+    // Recherche de l'utilisateur enseignant par email
+    const user = await Utilisateur.findOne({ where: { email } });
+    if (!user) {
+      return res.status(401).json({ error: 'Adresse e-mail ou mot de passe invalide' });
+    }
 
-//       // Ajout des informations de l'utilisateur au corps de la requête
-//       req.userId = decoded.id;
-//       req.userType = decoded.type_utilisateur;
+    // Comparaison des mots de passe hachés
+    const isPasswordValid = await bcrypt.compare(mot_de_passe, user.mot_de_passe);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Adresse e-mail ou mot de passe invalide' });
+    }
 
-//       next(); // Appel du prochain middleware ou de la fonction de routage
-//     });
-//   } catch (error) {
-//     console.error('Erreur d\'authentification de l\'utilisateur :', error);
-//     res.status(500).json({ error: 'Une erreur s\'est produite lors de l\'authentification de l\'utilisateur' });
-//   }
-// };
+    const token = jwt.sign(
+      { id: user.id, email: user.email, type_utilisateur: user.type_utilisateur },
+      accessTokenSecret,
+      { expiresIn: '2h' } // Expiration après 2 heures
+    );
+
+    res.status(200).json({ token, type_utilisateur: 'admin' });
+  } catch (error) {
+    console.error('Erreur lors de la connexion de l\'admin :', error);
+    res.status(500).json({ error: 'Une erreur s\'est produite lors de la connexion de l\'admin' });
+  }
+};

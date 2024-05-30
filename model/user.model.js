@@ -37,14 +37,18 @@ const Utilisateur = sequelize.define('utilisateurs', {
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
+    unique: {
+      args: true,
+      msg: 'Un utilisateur avec cette adresse e-mail existe déjà.',
+    },
     validate: {
       isEmail: {
         args: true,
-        msg: 'L\'adresse email doit être valide.',
+        msg: 'L\'adresse e-mail doit être valide.',
       },
     },
   },
+
   mot_de_passe: {
     type: DataTypes.STRING,
     allowNull: false,
